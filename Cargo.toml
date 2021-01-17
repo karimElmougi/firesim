@@ -1,5 +1,5 @@
 [package]
-name = "firecalc"
+name = "firesim"
 version = "0.1.0"
 authors = ["karim <karim.elmougi@gmail.com>"]
 edition = "2018"

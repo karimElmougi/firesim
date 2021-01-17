@@ -10,19 +10,23 @@ const CSV_HEADERS: &str = "Year,Salary,Income,Taxable Income,Net Income,Cost of 
             RRSP Assets,TFSA Assets,Unregistered Assets,Total Assets,\
             Goal,Retirement Income";
 
-struct NumberFormatter{
-    format: CustomFormat
+struct NumberFormatter {
+    format: CustomFormat,
 }
 
 impl NumberFormatter {
     fn new() -> NumberFormatter {
         NumberFormatter {
-            format: CustomFormat::builder().separator("_").build().unwrap()
+            format: CustomFormat::builder().separator("_").build().unwrap(),
         }
     }
 
     fn format(&self, n: i32) -> String {
-        if n >= 10_000 { n.to_formatted_string(&self.format)} else {n.to_string()}
+        if n >= 10_000 {
+            n.to_formatted_string(&self.format)
+        } else {
+            n.to_string()
+        }
     }
 }
 
@@ -44,7 +48,10 @@ fn main() {
     println!("{}", CSV_HEADERS);
 
     let formatter = NumberFormatter::new();
-    simulation.take(40).map(|s| to_csv(s, &formatter)).for_each(|s| println!("{}", s));
+    simulation
+        .take(40)
+        .map(|s| to_csv(s, &formatter))
+        .for_each(|s| println!("{}", s));
 }
 
 fn to_csv(step: SimulationStep, f: &NumberFormatter) -> String {
