@@ -1,10 +1,17 @@
+mod simulation;
 mod tax;
 
+const INFLATION_RATE: f64 = 1.02;
+
 fn main() {
-    let income = 80000;
-    let provincial_taxes = tax::compute_provincial(income, 2020);
-    let federal_taxes = tax::compute_federal(income, 2020);
-    let taxes = provincial_taxes + federal_taxes;
-    let net_income = income - taxes;
-    println!("{}", net_income);
+    let context = simulation::SimulationContext {
+        inflation: 1.02,
+        salary_growth: 1.05,
+        return_on_investment: 1.08,
+        goal_multiplier: 30,
+    };
+    let simulation = simulation::SimulationBuilder::new(80000, 20000, 25000, context).build();
+    let next = simulation.next();
+    println!("{:?}", simulation);
+    println!("{:?}", next);
 }

@@ -1,19 +1,14 @@
+use crate::INFLATION_RATE;
 use std::cmp::{max, min};
 
-type Dollar = u32;
-type Year = u32;
-
-const INFLATION_RATE: f64 = 1.02;
-const BASE_YEAR: Year = 2020;
-
 struct TaxBracket {
-    lower_bound: Dollar,
-    upper_bound: Dollar,
+    lower_bound: i32,
+    upper_bound: i32,
     percentage: f64,
 }
 
 impl TaxBracket {
-    fn new(lower_bound: Dollar, upper_bound: Dollar, percentage: f64) -> TaxBracket {
+    fn new(lower_bound: i32, upper_bound: i32, percentage: f64) -> TaxBracket {
         TaxBracket {
             lower_bound,
             upper_bound,
@@ -21,26 +16,26 @@ impl TaxBracket {
         }
     }
 
-    pub fn compute_tax(&self, income: Dollar) -> Dollar {
-        (max(
-            0,
-            min(income, self.upper_bound) as i32 - self.lower_bound as i32,
-        ) as f64
-            * self.percentage
-            / 100.0) as u32
+    pub fn compute_tax(&self, income: i32) -> i32 {
+        (max(0, min(income, self.upper_bound) - self.lower_bound) as f64 * self.percentage / 100.0)
+            as i32
     }
 
-    pub fn adjust_for_inflation(&self, elapsed_years: Year, inflation_rate: f64) -> TaxBracket {
-        let inflation = inflation_rate.powi(elapsed_years as i32);
+    pub fn adjust_for_inflation(&self, elapsed_years: i32, inflation_rate: f64) -> TaxBracket {
+        let inflation = inflation_rate.powi(elapsed_years);
         TaxBracket {
-            lower_bound: (self.lower_bound as f64 * inflation) as u32,
-            upper_bound: (self.upper_bound as f64 * inflation) as u32,
+            lower_bound: (self.lower_bound as f64 * inflation) as i32,
+            upper_bound: (self.upper_bound as f64 * inflation) as i32,
             ..*self
         }
     }
 }
 
-pub fn compute_provincial(income: Dollar, year: Year) -> Dollar {
+pub fn compute_net_income(income: i32, elapsed_years: i32) -> i32 {
+    income - compute_provincial(income, elapsed_years) - compute_federal(income, elapsed_years)
+}
+
+fn compute_provincial(income: i32, elapsed_years: i32) -> i32 {
     let base_brackets = [
         TaxBracket::new(0, 15_728, 0.0),
         TaxBracket::new(15_728, 45_105, 15.0),
@@ -49,10 +44,10 @@ pub fn compute_provincial(income: Dollar, year: Year) -> Dollar {
         TaxBracket::new(109_755, 999_999, 25.75),
     ];
 
-    compute_taxes(income, year, &base_brackets)
+    compute_taxes(income, elapsed_years, &base_brackets)
 }
 
-pub fn compute_federal(income: Dollar, year: Year) -> Dollar {
+fn compute_federal(income: i32, elapsed_years: i32) -> i32 {
     let base_brackets = [
         TaxBracket::new(0, 13_808, 0.0),
         TaxBracket::new(13_808, 49_020, 15.0),
@@ -62,13 +57,13 @@ pub fn compute_federal(income: Dollar, year: Year) -> Dollar {
         TaxBracket::new(216_511, 999_999, 33.0),
     ];
 
-    compute_taxes(income, year, &base_brackets)
+    compute_taxes(income, elapsed_years, &base_brackets)
 }
 
-fn compute_taxes(income: Dollar, year: Year, base_brackets: &[TaxBracket]) -> Dollar {
+fn compute_taxes(income: i32, elapsed_years: i32, base_brackets: &[TaxBracket]) -> i32 {
     base_brackets
         .iter()
-        .map(|b| b.adjust_for_inflation(year - BASE_YEAR, INFLATION_RATE))
+        .map(|b| b.adjust_for_inflation(elapsed_years, INFLATION_RATE))
         .map(|b| b.compute_tax(income))
         .sum()
 }
