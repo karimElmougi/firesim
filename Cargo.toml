@@ -5,3 +5,5 @@ authors = ["karim <karim.elmougi@gmail.com>"]
 edition = "2018"
 
 [dependencies]
+num-format = "0.4.0"
+

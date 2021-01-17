@@ -1,4 +1,5 @@
 use crate::tax;
+
 use std::cmp::{max, min};
 
 const RRSP_CONTRIBUTION_PERCENTAGE: f64 = 0.18;
@@ -8,16 +9,6 @@ const WITHDRAW_RATE: f64 = 0.04;
 
 pub struct Simulation {
     step: SimulationStep,
-}
-
-impl Simulation {
-    pub fn csv_headers() -> String {
-        "Year,Salary,Income,Taxable Income,Net Income,Cost of Living,\
-            RRSP Contribution,TFSA Contribution,Unregistered Contribution,\
-            RRSP Assets,TFSA Assets,Unregistered Assets,Total Assets\
-            "
-        .to_string()
-    }
 }
 
 impl Iterator for Simulation {
@@ -43,11 +34,11 @@ pub struct SimulationConfig {
 
 #[derive(Debug, Clone)]
 pub struct SimulationStep {
-    years_since_start: i32,
-    rrsp_contribution: i32,
-    rrsp_assets: i32,
-    tfsa_assets: i32,
-    unregistered_assets: i32,
+    pub years_since_start: i32,
+    pub rrsp_contribution: i32,
+    pub rrsp_assets: i32,
+    pub tfsa_assets: i32,
+    pub unregistered_assets: i32,
     config: SimulationConfig,
 }
 
@@ -162,23 +153,19 @@ impl SimulationStep {
             )
     }
 
+    pub fn retirement_cost_of_living(&self) -> i32 {
+        scale(
+            self.config.retirement_cost_of_living,
+            self.config.inflation,
+            self.years_since_start,
+        )
+    }
 
-    pub fn to_csv(&self) -> String {
-        format!(
-            "{},{},{},{},{},{},{},{},{},{},{},{},{}",
-            self.years_since_start + 1,
-            self.salary(),
-            self.income(),
-            self.taxable_income(),
-            self.net_income(),
-            self.cost_of_living(),
-            self.rrsp_contribution,
-            self.tfsa_contribution(),
-            self.unregistered_contribution(),
-            self.rrsp_assets,
-            self.tfsa_assets,
-            self.unregistered_assets,
-            self.total_assets(),
+    pub fn goal(&self) -> i32 {
+        scale(
+            self.config.goal_multiplier * self.retirement_cost_of_living(),
+            self.config.inflation,
+            self.years_since_start,
         )
     }
 }

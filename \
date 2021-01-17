@@ -1,0 +1,52 @@
+mod simulation;
+mod tax;
+
+use simulation::{Simulation, SimulationBuilder, SimulationConfig, SimulationStep};
+
+use num_format::{CustomFormat, ToFormattedString};
+
+const CSV_HEADERS: &str = "Year,Salary,Income,Taxable Income,Net Income,Cost of Living,\
+            RRSP Contribution,TFSA Contribution,Unregistered Contribution,\
+            RRSP Assets,TFSA Assets,Unregistered Assets,Total Assets\
+            ";
+
+fn main() {
+    let config = SimulationConfig {
+        inflation: 1.02,
+        salary_growth: 1.05,
+        return_on_investment: 1.08,
+        goal_multiplier: 30,
+        salary: 75_000,
+        cost_of_living: 20_000,
+        retirement_cost_of_living: 25_000,
+    };
+
+    let simulation = SimulationBuilder::new(config)
+        .with_rrsp_contribution_headroom(10_000)
+        .build();
+
+    println!("{}", CSV_HEADERS);
+    simulation.take(40).for_each(|s| println!("{}", to_csv(s)));
+}
+
+fn to_csv(step: SimulationStep) -> String {
+    let format = CustomFormat::builder().separator("_").build().unwrap();
+
+    format!(
+        "{},{},{},{},{},{},{},{},{},{},{},{},{}",
+        step.years_since_start + 1,
+        step.salary().to_formatted_string(&format),
+        step.income().to_formatted_string(&format),
+        step.taxable_income().to_formatted_string(&format),
+        step.net_income().to_formatted_string(&format),
+        step.cost_of_living().to_formatted_string(&format),
+        step.rrsp_contribution.to_formatted_string(&format),
+        step.tfsa_contribution().to_formatted_string(&format),
+        step.unregistered_contribution()
+            .to_formatted_string(&format),
+        step.rrsp_assets.to_formatted_string(&format),
+        step.tfsa_assets.to_formatted_string(&format),
+        step.unregistered_assets.to_formatted_string(&format),
+        step.total_assets().to_formatted_string(&format),
+    )
+}
