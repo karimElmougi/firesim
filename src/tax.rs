@@ -1,5 +1,6 @@
-use crate::INFLATION_RATE;
 use std::cmp::{max, min};
+
+const INFLATION_RATE: f64 = 1.02;
 
 struct TaxBracket {
     lower_bound: i32,

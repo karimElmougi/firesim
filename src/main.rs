@@ -1,17 +1,23 @@
 mod simulation;
 mod tax;
 
-const INFLATION_RATE: f64 = 1.02;
+use simulation::{Simulation, SimulationBuilder, SimulationConfig};
 
 fn main() {
-    let context = simulation::SimulationContext {
+    let config = SimulationConfig {
         inflation: 1.02,
         salary_growth: 1.05,
         return_on_investment: 1.08,
         goal_multiplier: 30,
+        salary: 75_000,
+        cost_of_living: 20_000,
+        retirement_cost_of_living: 25_000,
     };
-    let simulation = simulation::SimulationBuilder::new(80000, 20000, 25000, context).build();
-    let next = simulation.next();
-    println!("{:?}", simulation);
-    println!("{:?}", next);
+
+    let simulation = SimulationBuilder::new(config)
+        .with_rrsp_contribution_headroom(10_000)
+        .build();
+
+    println!("{}", Simulation::csv_headers());
+    simulation.take(2).for_each(|s| println!("{}", s.to_csv()));
 }
