@@ -2,13 +2,54 @@ use crate::tax;
 
 use std::cmp::{max, min};
 
+use serde::Deserialize;
+
 const RRSP_CONTRIBUTION_PERCENTAGE: f64 = 0.18;
 const MAX_RRSP_CONTRIBUTION: i32 = 27830;
 const MAX_TFSA_CONTRIBUTION: i32 = 6000;
 const WITHDRAW_RATE: f64 = 0.04;
 
+#[derive(Debug, Deserialize, Clone)]
+pub struct Config {
+    inflation: f64,
+    salary_growth: f64,
+    return_on_investment: f64,
+    goal_multiplier: i32,
+    salary: i32,
+    cost_of_living: i32,
+    retirement_cost_of_living: i32,
+    #[serde(default)]
+    rrsp_contribution_headroom: i32,
+    #[serde(default)]
+    rrsp_assets: i32,
+    #[serde(default)]
+    tfsa_assets: i32,
+    #[serde(default)]
+    unregistered_assets: i32,
+}
+
 pub struct Simulation {
     step: SimulationStep,
+}
+
+impl Simulation {
+    pub fn new(config: Config) -> Simulation {
+        let mut step = SimulationStep::new(config.clone());
+
+        step.unregistered_assets = config.unregistered_assets;
+        step.tfsa_assets = config.tfsa_assets;
+        step.rrsp_assets = config.rrsp_assets;
+        step.rrsp_contribution = min(
+            config.rrsp_contribution_headroom,
+            mul(step.income(), RRSP_CONTRIBUTION_PERCENTAGE),
+        );
+
+        step.tfsa_assets += step.tfsa_contribution();
+        step.unregistered_assets += step.unregistered_contribution();
+        step.rrsp_assets += step.rrsp_contribution;
+
+        Simulation { step }
+    }
 }
 
 impl Iterator for Simulation {
@@ -22,28 +63,17 @@ impl Iterator for Simulation {
 }
 
 #[derive(Debug, Clone)]
-pub struct SimulationConfig {
-    pub inflation: f64,
-    pub salary_growth: f64,
-    pub return_on_investment: f64,
-    pub goal_multiplier: i32,
-    pub salary: i32,
-    pub cost_of_living: i32,
-    pub retirement_cost_of_living: i32,
-}
-
-#[derive(Debug, Clone)]
 pub struct SimulationStep {
     pub years_since_start: i32,
     pub rrsp_contribution: i32,
     pub rrsp_assets: i32,
     pub tfsa_assets: i32,
     pub unregistered_assets: i32,
-    config: SimulationConfig,
+    config: Config,
 }
 
 impl SimulationStep {
-    fn new(config: SimulationConfig) -> SimulationStep {
+    fn new(config: Config) -> SimulationStep {
         SimulationStep {
             years_since_start: 0,
             rrsp_contribution: 0,
@@ -167,72 +197,6 @@ impl SimulationStep {
             self.config.inflation,
             self.years_since_start,
         )
-    }
-}
-
-pub struct SimulationBuilder {
-    rrsp_assets: i32,
-    tfsa_assets: i32,
-    unregistered_assets: i32,
-    rrsp_contribution_headroom: i32,
-    config: SimulationConfig,
-}
-
-impl SimulationBuilder {
-    pub fn new(config: SimulationConfig) -> SimulationBuilder {
-        SimulationBuilder {
-            rrsp_assets: 0,
-            tfsa_assets: 0,
-            unregistered_assets: 0,
-            rrsp_contribution_headroom: 0,
-            config,
-        }
-    }
-
-    pub fn with_rrsp_assets(self, assets: i32) -> SimulationBuilder {
-        SimulationBuilder {
-            rrsp_assets: assets,
-            ..self
-        }
-    }
-
-    pub fn with_tfsa_assets(self, assets: i32) -> SimulationBuilder {
-        SimulationBuilder {
-            tfsa_assets: assets,
-            ..self
-        }
-    }
-
-    pub fn with_unregistered_assets(self, assets: i32) -> SimulationBuilder {
-        SimulationBuilder {
-            unregistered_assets: assets,
-            ..self
-        }
-    }
-
-    pub fn with_rrsp_contribution_headroom(self, headroom: i32) -> SimulationBuilder {
-        SimulationBuilder {
-            rrsp_contribution_headroom: headroom,
-            ..self
-        }
-    }
-
-    pub fn build(self) -> Simulation {
-        let mut step = SimulationStep::new(self.config.clone());
-
-        step.unregistered_assets = self.unregistered_assets;
-        step.tfsa_assets = self.tfsa_assets;
-        step.rrsp_assets = self.rrsp_assets;
-        step.rrsp_contribution = min(
-            self.rrsp_contribution_headroom,
-            mul(step.income(), RRSP_CONTRIBUTION_PERCENTAGE),
-        );
-
-        step.tfsa_assets += step.tfsa_contribution();
-        step.unregistered_assets += step.unregistered_contribution();
-        step.rrsp_assets += step.rrsp_contribution;
-
-        Simulation { step }
     }
 }
 
