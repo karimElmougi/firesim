@@ -1,6 +1,5 @@
-use crate::tax;
-
 use std::cmp::{max, min};
+use std::rc::Rc;
 
 use serde::Deserialize;
 
@@ -8,6 +7,33 @@ const RRSP_CONTRIBUTION_PERCENTAGE: f64 = 0.18;
 const MAX_RRSP_CONTRIBUTION: i32 = 27830;
 const MAX_TFSA_CONTRIBUTION: i32 = 6000;
 const WITHDRAW_RATE: f64 = 0.04;
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(rename(deserialize = "tax_bracket"))]
+struct TaxBracket {
+    #[serde(default)]
+    lower_bound: i32,
+    #[serde(default)]
+    upper_bound: i32,
+    #[serde(default)]
+    percentage: f64,
+}
+
+impl TaxBracket {
+    pub fn compute_tax(&self, income: i32) -> i32 {
+        (max(0, min(income, self.upper_bound) - self.lower_bound) as f64 * self.percentage / 100.0)
+            as i32
+    }
+
+    pub fn adjust_for_inflation(&self, elapsed_years: i32, inflation_rate: f64) -> TaxBracket {
+        let inflation = inflation_rate.powi(elapsed_years);
+        TaxBracket {
+            lower_bound: (self.lower_bound as f64 * inflation) as i32,
+            upper_bound: (self.upper_bound as f64 * inflation) as i32,
+            ..*self
+        }
+    }
+}
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct Config {
@@ -26,6 +52,11 @@ pub struct Config {
     tfsa_assets: i32,
     #[serde(default)]
     unregistered_assets: i32,
+    #[serde(default)]
+    #[serde(alias = "state_tax_brackets")]
+    provincial_tax_brackets: Vec<TaxBracket>,
+    #[serde(default)]
+    federal_tax_brackets: Vec<TaxBracket>,
 }
 
 pub struct Simulation {
@@ -34,6 +65,7 @@ pub struct Simulation {
 
 impl Simulation {
     pub fn new(config: Config) -> Simulation {
+        let config = Rc::new(config);
         let mut step = SimulationStep::new(config.clone());
 
         step.unregistered_assets = config.unregistered_assets;
@@ -69,11 +101,11 @@ pub struct SimulationStep {
     pub rrsp_assets: i32,
     pub tfsa_assets: i32,
     pub unregistered_assets: i32,
-    config: Config,
+    config: Rc<Config>,
 }
 
 impl SimulationStep {
-    fn new(config: Config) -> SimulationStep {
+    fn new(config: Rc<Config>) -> SimulationStep {
         SimulationStep {
             years_since_start: 0,
             rrsp_contribution: 0,
@@ -138,7 +170,7 @@ impl SimulationStep {
     }
 
     pub fn net_income(&self) -> i32 {
-        tax::compute_net_income(self.taxable_income(), self.years_since_start)
+        compute_net_income(self.config.as_ref(), self.taxable_income(), self.years_since_start)
     }
 
     pub fn tfsa_contribution(&self) -> i32 {
@@ -177,7 +209,8 @@ impl SimulationStep {
 
     pub fn retirement_income(&self) -> i32 {
         withdraw_from(self.tfsa_assets)
-            + tax::compute_net_income(
+            + compute_net_income(
+                self.config.as_ref(),
                 withdraw_from(self.rrsp_assets + self.unregistered_assets),
                 self.years_since_start,
             )
@@ -211,3 +244,20 @@ fn scale(amount: i32, factor: f64, years: i32) -> i32 {
 fn mul(amount: i32, factor: f64) -> i32 {
     (amount as f64 * factor) as i32
 }
+
+pub fn compute_net_income(config: &Config, income: i32, elapsed_years: i32) -> i32 {
+    let provincial_taxes: i32 = config.provincial_tax_brackets
+        .iter()
+        .map(|b| b.adjust_for_inflation(elapsed_years, config.inflation))
+        .map(|b| b.compute_tax(income))
+        .sum();
+
+    let federal_taxes: i32 = config.federal_tax_brackets
+        .iter()
+        .map(|b| b.adjust_for_inflation(elapsed_years, config.inflation))
+        .map(|b| b.compute_tax(income))
+        .sum();
+
+    income - provincial_taxes - federal_taxes
+}
+

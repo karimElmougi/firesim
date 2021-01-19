@@ -1,5 +1,4 @@
 mod simulation;
-mod tax;
 
 use simulation::{Simulation, Config, SimulationStep};
 
