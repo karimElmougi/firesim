@@ -2,10 +2,15 @@ inflation = 1.02
 salary_growth = 1.08
 return_on_investment = 1.07
 goal_multiplier = 30
+
 salary = 75000
 cost_of_living = 25000
 retirement_cost_of_living = 25000
+
 rrsp_contribution_headroom = 10000
+rrsp_assets = 0
+tfsa_assets = 0
+unregistered_assets = 0
 
 # Quebec
 [[provincial_tax_brackets]]
