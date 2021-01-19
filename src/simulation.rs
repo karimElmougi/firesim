@@ -170,7 +170,11 @@ impl SimulationStep {
     }
 
     pub fn net_income(&self) -> i32 {
-        compute_net_income(self.config.as_ref(), self.taxable_income(), self.years_since_start)
+        compute_net_income(
+            self.config.as_ref(),
+            self.taxable_income(),
+            self.years_since_start,
+        )
     }
 
     pub fn tfsa_contribution(&self) -> i32 {
@@ -246,13 +250,15 @@ fn mul(amount: i32, factor: f64) -> i32 {
 }
 
 pub fn compute_net_income(config: &Config, income: i32, elapsed_years: i32) -> i32 {
-    let provincial_taxes: i32 = config.provincial_tax_brackets
+    let provincial_taxes: i32 = config
+        .provincial_tax_brackets
         .iter()
         .map(|b| b.adjust_for_inflation(elapsed_years, config.inflation))
         .map(|b| b.compute_tax(income))
         .sum();
 
-    let federal_taxes: i32 = config.federal_tax_brackets
+    let federal_taxes: i32 = config
+        .federal_tax_brackets
         .iter()
         .map(|b| b.adjust_for_inflation(elapsed_years, config.inflation))
         .map(|b| b.compute_tax(income))
@@ -260,4 +266,3 @@ pub fn compute_net_income(config: &Config, income: i32, elapsed_years: i32) -> i
 
     income - provincial_taxes - federal_taxes
 }
-
