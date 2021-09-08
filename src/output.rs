@@ -2,7 +2,7 @@ use crate::simulation::{Simulation, SimulationStep};
 
 use num_format::{CustomFormat, ToFormattedString};
 
-const CSV_HEADERS: &str = "Year,Salary,Income,Taxable Income,Net Income,Cost of Living,\
+const CSV_HEADERS: &str = "Year,Salary,Dividend Income,Income,Taxable Income,Net Income,Cost of Living,\
             RRSP Contribution,TFSA Contribution,Unregistered Contribution,\
             RRSP Assets,TFSA Assets,Unregistered Assets,Total Assets,\
             Goal,Retirement Income,Retirement Cost of Living";
@@ -38,9 +38,10 @@ pub fn print(sim: Simulation, number_of_years: usize) {
 
 fn to_csv(step: SimulationStep, f: &NumberFormatter) -> String {
     format!(
-        "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
+        "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
         step.years_since_start + 1,
         f.format(step.salary()),
+        f.format(step.dividends_income()),
         f.format(step.income()),
         f.format(step.taxable_income()),
         f.format(step.net_income()),
