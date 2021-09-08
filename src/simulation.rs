@@ -41,6 +41,8 @@ pub struct Config {
     salary_growth: f64,
     return_on_investment: f64,
     goal_multiplier: i32,
+    #[serde(default = "default_salary_cap")]
+    salary_cap: i32,
     salary: i32,
     cost_of_living: i32,
     retirement_cost_of_living: i32,
@@ -58,6 +60,8 @@ pub struct Config {
     #[serde(default)]
     federal_tax_brackets: Vec<TaxBracket>,
 }
+
+fn default_salary_cap() -> i32 { 999_999 }
 
 pub struct Simulation {
     step: SimulationStep,
@@ -147,11 +151,12 @@ impl SimulationStep {
     }
 
     pub fn salary(&self) -> i32 {
-        scale(
+        let scaled_salary = scale(
             self.config.salary,
             self.config.salary_growth,
             self.years_since_start,
-        )
+        );
+        min(self.config.salary_cap, scaled_salary)
     }
 
     pub fn dividends_income(&self) -> i32 {
