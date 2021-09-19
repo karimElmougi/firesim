@@ -71,7 +71,9 @@ impl Config {
     }
 }
 
-fn default_salary_cap() -> i32 { 999_999 }
+fn default_salary_cap() -> i32 {
+    999_999
+}
 
 pub struct Simulation {
     step: SimulationStep,
@@ -132,32 +134,34 @@ impl SimulationStep {
 
     fn next(&self) -> SimulationStep {
         let config = &self.config;
-        let mut next_step = self.clone();
+        let previous_year = self;
 
-        next_step.years_since_start += 1;
+        let years_since_start = previous_year.years_since_start + 1;
 
-        next_step.rrsp_contribution = {
-            let max_rrsp_contribution = scale(
-                MAX_RRSP_CONTRIBUTION,
-                config.inflation,
-                next_step.years_since_start,
-            );
-            min(
-                max_rrsp_contribution,
-                mul(self.income(), RRSP_CONTRIBUTION_PERCENTAGE),
-            )
+        let max_rrsp_contribution =
+            scale(MAX_RRSP_CONTRIBUTION, config.inflation, years_since_start);
+        let rrsp_contribution = min(
+            max_rrsp_contribution,
+            mul(previous_year.income(), RRSP_CONTRIBUTION_PERCENTAGE),
+        );
+        let rrsp_assets =
+            previous_year.rrsp_assets + previous_year.rrsp_growth() + rrsp_contribution;
+
+        let mut next_year = SimulationStep {
+            years_since_start,
+            rrsp_contribution,
+            rrsp_assets,
+            ..previous_year.clone()
         };
 
-        next_step.rrsp_assets =
-            mul(self.rrsp_assets, config.return_on_investment) + next_step.rrsp_contribution;
+        next_year.tfsa_assets =
+            previous_year.tfsa_assets + previous_year.tfsa_growth() + next_year.tfsa_contribution();
 
-        next_step.tfsa_assets =
-            mul(self.tfsa_assets, config.return_on_investment) + next_step.tfsa_contribution();
+        next_year.unregistered_assets = previous_year.unregistered_assets
+            + previous_year.unregistered_growth()
+            + next_year.unregistered_contribution();
 
-        next_step.unregistered_assets = mul(self.unregistered_assets, config.growth_rate())
-            + next_step.unregistered_contribution();
-
-        next_step
+        next_year
     }
 
     pub fn salary(&self) -> i32 {
@@ -170,10 +174,7 @@ impl SimulationStep {
     }
 
     pub fn dividends_income(&self) -> i32 {
-        mul(
-            self.unregistered_assets,
-            self.config.dividends_rate() - 1.0,
-        )
+        mul(self.unregistered_assets, self.config.dividends_rate() - 1.0)
     }
 
     pub fn income(&self) -> i32 {
@@ -186,10 +187,10 @@ impl SimulationStep {
 
     pub fn net_income(&self) -> i32 {
         compute_net_income(
-            self.config.as_ref(),
+            &self.config,
             self.years_since_start,
             self.taxable_income(),
-            0
+            0,
         )
     }
 
@@ -252,6 +253,18 @@ impl SimulationStep {
             self.years_since_start,
         )
     }
+
+    fn tfsa_growth(&self) -> i32 {
+        mul(self.tfsa_assets, self.config.return_on_investment - 1.0)
+    }
+
+    fn rrsp_growth(&self) -> i32 {
+        mul(self.rrsp_assets, self.config.return_on_investment - 1.0)
+    }
+
+    fn unregistered_growth(&self) -> i32 {
+        mul(self.unregistered_assets, self.config.growth_rate() - 1.0)
+    }
 }
 
 fn withdraw_from(assets: i32) -> i32 {
@@ -266,7 +279,12 @@ fn mul(amount: i32, factor: f64) -> i32 {
     (amount as f64 * factor) as i32
 }
 
-pub fn compute_net_income(config: &Config, elapsed_years: i32, income: i32, capital_gains: i32) -> i32 {
+pub fn compute_net_income(
+    config: &Config,
+    elapsed_years: i32,
+    income: i32,
+    capital_gains: i32,
+) -> i32 {
     let provincial_taxes: i32 = config
         .provincial_tax_brackets
         .iter()

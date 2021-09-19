@@ -2,7 +2,8 @@ use crate::simulation::{Simulation, SimulationStep};
 
 use num_format::{CustomFormat, ToFormattedString};
 
-const CSV_HEADERS: &str = "Year,Salary,Dividend Income,Income,Taxable Income,Net Income,Cost of Living,\
+const CSV_HEADERS: &str =
+    "Year,Salary,Dividend Income,Income,Taxable Income,Net Income,Cost of Living,\
             RRSP Contribution,TFSA Contribution,Unregistered Contribution,\
             RRSP Assets,TFSA Assets,Unregistered Assets,Total Assets,\
             Goal,Retirement Income,Retirement Cost of Living";
