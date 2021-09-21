@@ -1,7 +1,17 @@
-inflation = 1.025
+inflation = 1.02 
 salary_growth = 1.1
-return_on_investment = 1.10
-withdraw_rate = 0.03
+return_on_investment = 1.07
+
+# How much to withdraw from the portfolio each year during retirement
+# Higher rate -> less time to save up for retirement but higher chance of 
+# prematurely exhausting funds
+# Lower rate -> more time to save up for retirement but less chance of 
+# prematurely exhausting funds
+# In particular, this value should be kept inferior to your ROI minus inflation
+# if long-term sustainability is desired
+# 4% is safe in more than 90% of historical 40 year periods
+# 3% is rock-solid in all historical 40 year periods
+withdraw_rate = 0.04
 
 salary = 140_000
 salary_cap = 500_000
@@ -34,42 +44,6 @@ unregistered_assets = 0
   lower_bound = 109755
   upper_bound = 999999
   percentage = 25.75
-
-# Washington State
-#  [[provincial_tax_brackets]]
-#  lower_bound = 0
-#  upper_bound = 999_999
-#  percentage = 2.75
-
-# USA
-#[[federal_tax_brackets]]
-  #lower_bound = 0
-  #upper_bound = 9875
-  #percentage = 10
-#[[federal_tax_brackets]]
-  #lower_bound = 9875
-  #upper_bound = 40125
-  #percentage = 12
-#[[federal_tax_brackets]]
-  #lower_bound = 40125
-  #upper_bound = 85525
-  #percentage = 22
-#[[federal_tax_brackets]]
-  #lower_bound = 85525
-  #upper_bound = 163300
-  #percentage = 24
-#[[federal_tax_brackets]]
-  #lower_bound = 163300
-  #upper_bound = 207350
-  #percentage = 32
-#[[federal_tax_brackets]]
-  #lower_bound = 207350
-  #upper_bound = 518400
-  #percentage = 35
-#[[federal_tax_brackets]]
-  #lower_bound = 518400
-  #upper_bound = 999_999
-  #percentage = 37
 
 # Ontario
 #[[provincial_tax_brackets]]
@@ -122,4 +96,40 @@ unregistered_assets = 0
   lower_bound = 216511
   upper_bound = 999999
   percentage = 33.0
+
+# Washington State
+#  [[provincial_tax_brackets]]
+#  lower_bound = 0
+#  upper_bound = 999_999
+#  percentage = 2.75
+
+# USA
+#[[federal_tax_brackets]]
+  #lower_bound = 0
+  #upper_bound = 9875
+  #percentage = 10
+#[[federal_tax_brackets]]
+  #lower_bound = 9875
+  #upper_bound = 40125
+  #percentage = 12
+#[[federal_tax_brackets]]
+  #lower_bound = 40125
+  #upper_bound = 85525
+  #percentage = 22
+#[[federal_tax_brackets]]
+  #lower_bound = 85525
+  #upper_bound = 163300
+  #percentage = 24
+#[[federal_tax_brackets]]
+  #lower_bound = 163300
+  #upper_bound = 207350
+  #percentage = 32
+#[[federal_tax_brackets]]
+  #lower_bound = 207350
+  #upper_bound = 518400
+  #percentage = 35
+#[[federal_tax_brackets]]
+  #lower_bound = 518400
+  #upper_bound = 999_999
+  #percentage = 37
 
