@@ -1,7 +1,7 @@
 inflation = 1.025
 salary_growth = 1.1
 return_on_investment = 1.10
-goal_multiplier = 30
+withdraw_rate = 0.03
 
 salary = 140_000
 salary_cap = 500_000

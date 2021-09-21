@@ -6,7 +6,6 @@ use serde::Deserialize;
 const RRSP_CONTRIBUTION_PERCENTAGE: f64 = 0.18;
 const MAX_RRSP_CONTRIBUTION: i32 = 27830;
 const MAX_TFSA_CONTRIBUTION: i32 = 6000;
-const WITHDRAW_RATE: f64 = 0.04;
 
 #[derive(Debug, Deserialize, Clone)]
 #[serde(rename(deserialize = "tax_bracket"))]
@@ -40,7 +39,8 @@ pub struct Config {
     inflation: f64,
     salary_growth: f64,
     return_on_investment: f64,
-    goal_multiplier: i32,
+    #[serde(default = "default_withdraw_rate")]
+    withdraw_rate: f64,
     #[serde(default = "default_salary_cap")]
     salary_cap: i32,
     salary: i32,
@@ -62,17 +62,25 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn growth_rate(&self) -> f64 {
+    fn growth_rate(&self) -> f64 {
         1.0 + 0.75 * (self.return_on_investment - 1.0)
     }
 
-    pub fn dividends_rate(&self) -> f64 {
+    fn dividends_rate(&self) -> f64 {
         1.0 + 0.25 * (self.return_on_investment - 1.0)
+    }
+
+    fn goal_multiplier(&self) -> i32 {
+        (1.0 / self.withdraw_rate) as i32
     }
 }
 
 fn default_salary_cap() -> i32 {
     999_999
+}
+
+fn default_withdraw_rate() -> f64 {
+    0.04
 }
 
 pub struct Simulation {
@@ -229,12 +237,12 @@ impl SimulationStep {
     }
 
     pub fn retirement_income(&self) -> i32 {
-        withdraw_from(self.tfsa_assets)
+        withdraw_from(&self.config, self.tfsa_assets)
             + compute_net_income(
                 self.config.as_ref(),
                 self.years_since_start,
-                withdraw_from(self.rrsp_assets) + self.dividends_income(),
-                withdraw_from(self.unregistered_assets),
+                withdraw_from(&self.config, self.rrsp_assets) + self.dividends_income(),
+                withdraw_from(&self.config, self.unregistered_assets),
             )
     }
 
@@ -248,7 +256,7 @@ impl SimulationStep {
 
     pub fn goal(&self) -> i32 {
         scale(
-            self.config.goal_multiplier * self.retirement_cost_of_living(),
+            self.config.goal_multiplier() * self.retirement_cost_of_living(),
             self.config.inflation,
             self.years_since_start,
         )
@@ -267,8 +275,8 @@ impl SimulationStep {
     }
 }
 
-fn withdraw_from(assets: i32) -> i32 {
-    mul(assets, WITHDRAW_RATE)
+fn withdraw_from(config: &Config, assets: i32) -> i32 {
+    mul(assets, config.withdraw_rate)
 }
 
 fn scale(amount: i32, factor: f64, years: i32) -> i32 {
