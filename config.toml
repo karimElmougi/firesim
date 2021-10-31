@@ -18,6 +18,7 @@ salary_cap = 500_000
 cost_of_living = 25_000
 retirement_cost_of_living = 25_000
 
+employer_rrsp_match = 0.06
 rrsp_contribution_headroom = 14_400
 rrsp_assets = 15_000
 tfsa_assets = 24_000

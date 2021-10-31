@@ -39,24 +39,36 @@ pub struct Config {
     inflation: f64,
     salary_growth: f64,
     return_on_investment: f64,
+
     #[serde(default = "default_withdraw_rate")]
     withdraw_rate: f64,
+
+    #[serde(default)]
+    employer_rrsp_match: f64,
+
     #[serde(default = "default_salary_cap")]
     salary_cap: i32,
+
     salary: i32,
     cost_of_living: i32,
     retirement_cost_of_living: i32,
+
     #[serde(default)]
     rrsp_contribution_headroom: i32,
+
     #[serde(default)]
     rrsp_assets: i32,
+
     #[serde(default)]
     tfsa_assets: i32,
+
     #[serde(default)]
     unregistered_assets: i32,
+
     #[serde(default)]
     #[serde(alias = "state_tax_brackets")]
     provincial_tax_brackets: Vec<TaxBracket>,
+
     #[serde(default)]
     federal_tax_brackets: Vec<TaxBracket>,
 }
@@ -95,14 +107,12 @@ impl Simulation {
         step.unregistered_assets = config.unregistered_assets;
         step.tfsa_assets = config.tfsa_assets;
         step.rrsp_assets = config.rrsp_assets;
-        step.rrsp_contribution = min(
-            config.rrsp_contribution_headroom,
-            mul(step.income(), RRSP_CONTRIBUTION_PERCENTAGE),
-        );
+        step.employer_rrsp_contribution = 2 * employer_rrsp_match(config.salary, config.rrsp_contribution_headroom, config.employer_rrsp_match);
+        step.personal_rrsp_contribution = config.rrsp_contribution_headroom - step.employer_rrsp_contribution;
 
         step.tfsa_assets += step.tfsa_contribution();
         step.unregistered_assets += step.unregistered_contribution();
-        step.rrsp_assets += step.rrsp_contribution;
+        step.rrsp_assets += step.personal_rrsp_contribution;
 
         Simulation { step }
     }
@@ -121,7 +131,8 @@ impl Iterator for Simulation {
 #[derive(Debug, Clone)]
 pub struct SimulationStep {
     pub years_since_start: i32,
-    pub rrsp_contribution: i32,
+    pub personal_rrsp_contribution: i32,
+    pub employer_rrsp_contribution: i32,
     pub rrsp_assets: i32,
     pub tfsa_assets: i32,
     pub unregistered_assets: i32,
@@ -132,7 +143,8 @@ impl SimulationStep {
     fn new(config: Rc<Config>) -> SimulationStep {
         SimulationStep {
             years_since_start: 0,
-            rrsp_contribution: 0,
+            personal_rrsp_contribution: 0,
+            employer_rrsp_contribution: 0,
             rrsp_assets: 0,
             tfsa_assets: 0,
             unregistered_assets: 0,
@@ -146,18 +158,20 @@ impl SimulationStep {
 
         let years_since_start = previous_year.years_since_start + 1;
 
-        let max_rrsp_contribution =
-            scale(MAX_RRSP_CONTRIBUTION, config.inflation, years_since_start);
-        let rrsp_contribution = min(
-            max_rrsp_contribution,
-            mul(previous_year.income(), RRSP_CONTRIBUTION_PERCENTAGE),
-        );
+        let rrsp_contribution_headroom = rrsp_contribution_headroom(previous_year.income(), years_since_start, config.inflation);
+        let employer_rrsp_match = employer_rrsp_match(previous_year.salary(), rrsp_contribution_headroom, config.employer_rrsp_match);
+
+        let personal_rrsp_contribution = rrsp_contribution_headroom - 2 * employer_rrsp_match;
+        let employer_rrsp_contribution = employer_rrsp_match * 2;
+        let total_rrsp_contribution = personal_rrsp_contribution + employer_rrsp_contribution;
+
         let rrsp_assets =
-            previous_year.rrsp_assets + previous_year.rrsp_growth() + rrsp_contribution;
+            previous_year.rrsp_assets + previous_year.rrsp_growth() + total_rrsp_contribution;
 
         let mut next_year = SimulationStep {
             years_since_start,
-            rrsp_contribution,
+            personal_rrsp_contribution,
+            employer_rrsp_contribution,
             rrsp_assets,
             ..previous_year.clone()
         };
@@ -190,7 +204,7 @@ impl SimulationStep {
     }
 
     pub fn taxable_income(&self) -> i32 {
-        self.income() - self.rrsp_contribution
+        self.income() - self.personal_rrsp_contribution
     }
 
     pub fn net_income(&self) -> i32 {
@@ -200,6 +214,10 @@ impl SimulationStep {
             self.taxable_income(),
             0,
         )
+    }
+
+    pub fn total_rrsp_contribution(&self) -> i32 {
+        self.personal_rrsp_contribution + self.employer_rrsp_contribution
     }
 
     pub fn tfsa_contribution(&self) -> i32 {
@@ -287,6 +305,30 @@ fn mul(amount: i32, factor: f64) -> i32 {
     (amount as f64 * factor) as i32
 }
 
+fn rrsp_contribution_headroom(income: i32, years_since_start: i32, inflation_rate: f64) -> i32 {
+    let max_rrsp_contribution = scale(MAX_RRSP_CONTRIBUTION, inflation_rate, years_since_start);
+    min(
+        max_rrsp_contribution,
+        mul(income, RRSP_CONTRIBUTION_PERCENTAGE),
+    )
+}
+
+fn employer_rrsp_match(
+    salary: i32,
+    rrsp_contribution_headroom: i32,
+    employer_rrsp_match_percentage: f64,
+) -> i32 {
+    let max_employer_rrsp_match = mul(salary, employer_rrsp_match_percentage);
+    let max_contribution_to_employer_rrsp = 2 * max_employer_rrsp_match;
+
+    let leftover_rrsp_headroom = rrsp_contribution_headroom - max_contribution_to_employer_rrsp;
+    if leftover_rrsp_headroom < 0 {
+        rrsp_contribution_headroom / 2
+    } else {
+        max_employer_rrsp_match
+    }
+}
+
 pub fn compute_net_income(
     config: &Config,
     elapsed_years: i32,
@@ -309,3 +351,4 @@ pub fn compute_net_income(
 
     income + capital_gains - provincial_taxes - federal_taxes
 }
+
