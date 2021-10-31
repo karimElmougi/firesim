@@ -6,7 +6,7 @@ const CSV_HEADERS: &str =
     "Year,Salary,Dividend Income,Income,Taxable Income,Net Income,Cost of Living,\
             Personal RRSP Contribution,Contribution to Employer RRSP,RRSP Contribution,TFSA Contribution,Unregistered Contribution,\
             Total Contribution,RRSP Assets,TFSA Assets,Unregistered Assets,Total Assets,\
-            Goal,Retirement Income,Retirement Cost of Living";
+            Goal,Passive Income,Retirement Cost of Living";
 
 struct NumberFormatter {
     format: CustomFormat,
@@ -62,7 +62,7 @@ fn to_csv(step: SimulationStep, f: &NumberFormatter, base_year: usize) -> String
         f.format(step.unregistered_assets),
         f.format(step.total_assets()),
         f.format(step.goal()),
-        f.format(step.retirement_income()),
+        f.format(step.passive_income()),
         f.format(step.retirement_cost_of_living())
     )
 }

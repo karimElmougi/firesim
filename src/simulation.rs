@@ -254,7 +254,7 @@ impl SimulationStep {
         )
     }
 
-    pub fn retirement_income(&self) -> i32 {
+    pub fn passive_income(&self) -> i32 {
         withdraw_from(&self.config, self.tfsa_assets)
             + compute_net_income(
                 self.config.as_ref(),
