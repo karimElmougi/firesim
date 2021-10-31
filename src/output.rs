@@ -5,7 +5,7 @@ use num_format::{CustomFormat, ToFormattedString};
 const CSV_HEADERS: &str =
     "Year,Salary,Dividend Income,Income,Taxable Income,Net Income,Cost of Living,\
             RRSP Contribution,TFSA Contribution,Unregistered Contribution,\
-            RRSP Assets,TFSA Assets,Unregistered Assets,Total Assets,\
+            Total Contribution,RRSP Assets,TFSA Assets,Unregistered Assets,Total Assets,\
             Goal,Retirement Income,Retirement Cost of Living";
 
 struct NumberFormatter {
@@ -39,7 +39,7 @@ pub fn print(sim: Simulation, number_of_years: usize) {
 
 fn to_csv(step: SimulationStep, f: &NumberFormatter) -> String {
     format!(
-        "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
+        "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
         step.years_since_start + 1,
         f.format(step.salary()),
         f.format(step.dividends_income()),
@@ -50,6 +50,7 @@ fn to_csv(step: SimulationStep, f: &NumberFormatter) -> String {
         f.format(step.rrsp_contribution),
         f.format(step.tfsa_contribution()),
         f.format(step.unregistered_contribution()),
+        f.format(step.rrsp_contribution + step.tfsa_contribution() + step.unregistered_contribution()),
         f.format(step.rrsp_assets),
         f.format(step.tfsa_assets),
         f.format(step.unregistered_assets),
