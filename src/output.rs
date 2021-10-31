@@ -28,19 +28,19 @@ impl NumberFormatter {
     }
 }
 
-pub fn print(sim: Simulation, number_of_years: usize) {
+pub fn print(sim: Simulation, number_of_years: usize, base_year: usize) {
     println!("{}", CSV_HEADERS);
 
     let formatter = NumberFormatter::new();
     sim.take(number_of_years)
-        .map(|s| to_csv(s, &formatter))
+        .map(|s| to_csv(s, &formatter, base_year))
         .for_each(|s| println!("{}", s));
 }
 
-fn to_csv(step: SimulationStep, f: &NumberFormatter) -> String {
+fn to_csv(step: SimulationStep, f: &NumberFormatter, base_year: usize) -> String {
     format!(
         "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
-        step.years_since_start + 1,
+        base_year as i32 + step.years_since_start + 1,
         f.format(step.salary()),
         f.format(step.dividends_income()),
         f.format(step.income()),

@@ -11,6 +11,9 @@ struct Opt {
     #[structopt(short, long, default_value = "20")]
     number_of_years: usize,
 
+    #[structopt(short, long, default_value = "0")]
+    base_year: usize,
+
     #[structopt(short, long)]
     config_file: Option<String>,
 }
@@ -25,5 +28,5 @@ fn main() {
     .expect("invalid TOML in config file");
 
     let simulation = Simulation::new(config);
-    output::print(simulation, opt.number_of_years);
+    output::print(simulation, opt.number_of_years, opt.base_year);
 }
