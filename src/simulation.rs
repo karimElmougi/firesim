@@ -1,5 +1,3 @@
-use std::cmp::{max, min};
-
 use serde::Deserialize;
 
 const RRSP_CONTRIBUTION_PERCENTAGE: f64 = 0.18;
@@ -20,9 +18,12 @@ struct TaxBracket {
 }
 
 impl TaxBracket {
-    pub fn compute_tax(&self, income: i32) -> i32 {
-        let portion_of_income = max(0, min(income, self.upper_bound) - self.lower_bound);
-        (portion_of_income as f64 * self.rate / 100.0) as i32
+    pub fn compute_tax(&self, income: f64) -> f64 {
+        let portion_of_income = f64::max(
+            0.0,
+            f64::min(income, self.upper_bound as f64) - self.lower_bound as f64,
+        );
+        portion_of_income * self.rate / 100.0
     }
 
     pub fn adjust_for_inflation(&self, elapsed_years: i32, inflation_rate: f64) -> TaxBracket {
@@ -81,8 +82,8 @@ impl Config {
         1.0 + 0.25 * (self.return_on_investment - 1.0)
     }
 
-    fn goal_multiplier(&self) -> i32 {
-        (1.0 / self.withdraw_rate) as i32
+    fn goal_multiplier(&self) -> f64 {
+        1.0 / self.withdraw_rate
     }
 }
 
@@ -102,16 +103,17 @@ impl<'a> Simulation<'a> {
     pub fn new(config: &'a Config) -> Self {
         let mut step = SimulationStep::new(config);
 
-        step.unregistered_assets = config.unregistered_assets;
-        step.tfsa_assets = config.tfsa_assets;
-        step.rrsp_assets = config.rrsp_assets;
-        step.employer_rrsp_contribution = 2 * employer_rrsp_match(
-            config.salary,
-            config.rrsp_contribution_headroom,
-            config.employer_rrsp_match,
-        );
+        step.unregistered_assets = config.unregistered_assets as f64;
+        step.tfsa_assets = config.tfsa_assets as f64;
+        step.rrsp_assets = config.rrsp_assets as f64;
+        step.employer_rrsp_contribution = 2.0
+            * employer_rrsp_match(
+                config.salary as f64,
+                config.rrsp_contribution_headroom as f64,
+                config.employer_rrsp_match,
+            );
         step.personal_rrsp_contribution =
-            config.rrsp_contribution_headroom - step.employer_rrsp_contribution;
+            config.rrsp_contribution_headroom as f64 - step.employer_rrsp_contribution;
 
         step.tfsa_assets += step.tfsa_contribution();
         step.unregistered_assets += step.unregistered_contribution();
@@ -134,11 +136,11 @@ impl<'a> Iterator for Simulation<'a> {
 #[derive(Debug, Clone)]
 pub struct SimulationStep<'a> {
     pub years_since_start: i32,
-    pub personal_rrsp_contribution: i32,
-    pub employer_rrsp_contribution: i32,
-    pub rrsp_assets: i32,
-    pub tfsa_assets: i32,
-    pub unregistered_assets: i32,
+    pub personal_rrsp_contribution: f64,
+    pub employer_rrsp_contribution: f64,
+    pub rrsp_assets: f64,
+    pub tfsa_assets: f64,
+    pub unregistered_assets: f64,
     config: &'a Config,
 }
 
@@ -146,11 +148,11 @@ impl<'a> SimulationStep<'a> {
     fn new(config: &'a Config) -> SimulationStep {
         SimulationStep {
             years_since_start: 0,
-            personal_rrsp_contribution: 0,
-            employer_rrsp_contribution: 0,
-            rrsp_assets: 0,
-            tfsa_assets: 0,
-            unregistered_assets: 0,
+            personal_rrsp_contribution: 0.0,
+            employer_rrsp_contribution: 0.0,
+            rrsp_assets: 0.0,
+            tfsa_assets: 0.0,
+            unregistered_assets: 0.0,
             config,
         }
     }
@@ -169,8 +171,8 @@ impl<'a> SimulationStep<'a> {
             config.employer_rrsp_match,
         );
 
-        let personal_rrsp_contribution = rrsp_contribution_headroom - 2 * employer_rrsp_match;
-        let employer_rrsp_contribution = employer_rrsp_match * 2;
+        let personal_rrsp_contribution = rrsp_contribution_headroom - 2.0 * employer_rrsp_match;
+        let employer_rrsp_contribution = employer_rrsp_match * 2.0;
         let total_rrsp_contribution = personal_rrsp_contribution + employer_rrsp_contribution;
 
         let rrsp_assets =
@@ -194,144 +196,115 @@ impl<'a> SimulationStep<'a> {
         next_year
     }
 
-    pub fn salary(&self) -> i32 {
-        let scaled_salary = scale(
-            self.config.salary,
-            self.config.salary_growth,
-            self.years_since_start,
-        );
-        min(self.config.salary_cap, scaled_salary)
+    pub fn salary(&self) -> f64 {
+        let salary =
+            self.config.salary as f64 * self.config.salary_growth.powi(self.years_since_start);
+        f64::min(self.config.salary_cap as f64, salary)
     }
 
-    pub fn dividends_income(&self) -> i32 {
-        mul(self.unregistered_assets, self.config.dividends_rate() - 1.0)
+    pub fn dividends_income(&self) -> f64 {
+        self.unregistered_assets * (self.config.dividends_rate() - 1.0)
     }
 
-    pub fn income(&self) -> i32 {
+    pub fn income(&self) -> f64 {
         self.salary() + self.dividends_income()
     }
 
-    pub fn taxable_income(&self) -> i32 {
+    pub fn taxable_income(&self) -> f64 {
         self.income() - self.personal_rrsp_contribution
     }
 
-    pub fn net_income(&self) -> i32 {
+    pub fn net_income(&self) -> f64 {
         compute_net_income(
             self.config,
             self.years_since_start,
             self.taxable_income(),
-            0,
+            0.0,
         )
     }
 
-    pub fn total_rrsp_contribution(&self) -> i32 {
+    pub fn total_rrsp_contribution(&self) -> f64 {
         self.personal_rrsp_contribution + self.employer_rrsp_contribution
     }
 
-    pub fn tfsa_contribution(&self) -> i32 {
-        let max_tfsa_contribution = scale(
-            MAX_TFSA_CONTRIBUTION,
-            self.config.inflation,
-            self.years_since_start,
-        );
-        max(
-            0,
-            min(
+    pub fn tfsa_contribution(&self) -> f64 {
+        let max_tfsa_contribution =
+            MAX_TFSA_CONTRIBUTION as f64 * self.config.inflation.powi(self.years_since_start);
+        f64::max(
+            0.0,
+            f64::min(
                 max_tfsa_contribution,
                 self.net_income() - self.cost_of_living(),
             ),
         )
     }
 
-    pub fn unregistered_contribution(&self) -> i32 {
-        max(
-            0,
+    pub fn unregistered_contribution(&self) -> f64 {
+        f64::max(
+            0.0,
             self.net_income() - self.cost_of_living() - self.tfsa_contribution(),
         )
     }
 
-    pub fn total_assets(&self) -> i32 {
+    pub fn total_assets(&self) -> f64 {
         self.rrsp_assets + self.tfsa_assets + self.unregistered_assets
     }
 
-    pub fn cost_of_living(&self) -> i32 {
-        scale(
-            self.config.cost_of_living,
-            self.config.inflation,
-            self.years_since_start,
-        )
+    pub fn cost_of_living(&self) -> f64 {
+        self.config.cost_of_living as f64 * self.config.inflation.powi(self.years_since_start)
     }
 
-    pub fn passive_income(&self) -> i32 {
-        withdraw_from(self.config, self.tfsa_assets)
+    pub fn passive_income(&self) -> f64 {
+        (self.tfsa_assets * self.config.withdraw_rate)
             + compute_net_income(
                 self.config,
                 self.years_since_start,
-                withdraw_from(self.config, self.rrsp_assets) + self.dividends_income(),
-                withdraw_from(self.config, self.unregistered_assets),
+                (self.rrsp_assets * self.config.withdraw_rate) + self.dividends_income(),
+                self.unregistered_assets * self.config.withdraw_rate,
             )
     }
 
-    pub fn retirement_cost_of_living(&self) -> i32 {
-        scale(
-            self.config.retirement_cost_of_living,
-            self.config.inflation,
-            self.years_since_start,
-        )
+    pub fn retirement_cost_of_living(&self) -> f64 {
+        self.config.retirement_cost_of_living as f64
+            * self.config.inflation.powi(self.years_since_start)
     }
 
-    pub fn goal(&self) -> i32 {
-        scale(
-            self.config.goal_multiplier() * self.retirement_cost_of_living(),
-            self.config.inflation,
-            self.years_since_start,
-        )
+    pub fn goal(&self) -> f64 {
+        self.retirement_cost_of_living()
+            * self.config.goal_multiplier()
+            * self.config.inflation.powi(self.years_since_start)
     }
 
-    fn tfsa_growth(&self) -> i32 {
-        mul(self.tfsa_assets, self.config.return_on_investment - 1.0)
+    fn tfsa_growth(&self) -> f64 {
+        self.tfsa_assets * (self.config.return_on_investment - 1.0)
     }
 
-    fn rrsp_growth(&self) -> i32 {
-        mul(self.rrsp_assets, self.config.return_on_investment - 1.0)
+    fn rrsp_growth(&self) -> f64 {
+        self.rrsp_assets * (self.config.return_on_investment - 1.0)
     }
 
-    fn unregistered_growth(&self) -> i32 {
-        mul(self.unregistered_assets, self.config.growth_rate() - 1.0)
+    fn unregistered_growth(&self) -> f64 {
+        self.unregistered_assets * (self.config.growth_rate() - 1.0)
     }
 }
 
-fn withdraw_from(config: &Config, assets: i32) -> i32 {
-    mul(assets, config.withdraw_rate)
-}
-
-fn scale(amount: i32, factor: f64, years: i32) -> i32 {
-    mul(amount, factor.powi(years))
-}
-
-fn mul(amount: i32, factor: f64) -> i32 {
-    (amount as f64 * factor) as i32
-}
-
-fn rrsp_contribution_headroom(income: i32, years_since_start: i32, inflation_rate: f64) -> i32 {
-    let max_rrsp_contribution = scale(MAX_RRSP_CONTRIBUTION, inflation_rate, years_since_start);
-    min(
-        max_rrsp_contribution,
-        mul(income, RRSP_CONTRIBUTION_PERCENTAGE),
-    )
+fn rrsp_contribution_headroom(income: f64, years_since_start: i32, inflation_rate: f64) -> f64 {
+    let max_rrsp_contribution =
+        MAX_RRSP_CONTRIBUTION as f64 * inflation_rate.powi(years_since_start);
+    f64::min(max_rrsp_contribution, income * RRSP_CONTRIBUTION_PERCENTAGE)
 }
 
 fn employer_rrsp_match(
-    salary: i32,
-    rrsp_contribution_headroom: i32,
+    salary: f64,
+    rrsp_contribution_headroom: f64,
     employer_rrsp_match_percentage: f64,
-) -> i32 {
-    let max_employer_rrsp_match = mul(salary, employer_rrsp_match_percentage);
-    let max_contribution_to_employer_rrsp = 2 * max_employer_rrsp_match;
+) -> f64 {
+    let max_employer_rrsp_match = salary * employer_rrsp_match_percentage;
+    let max_contribution_to_employer_rrsp = 2.0 * max_employer_rrsp_match;
 
     let leftover_rrsp_headroom = rrsp_contribution_headroom - max_contribution_to_employer_rrsp;
-    if leftover_rrsp_headroom < 0 {
-        rrsp_contribution_headroom / 2
+    if leftover_rrsp_headroom.is_sign_negative() {
+        rrsp_contribution_headroom / 2.0
     } else {
         max_employer_rrsp_match
     }
@@ -340,21 +313,21 @@ fn employer_rrsp_match(
 pub fn compute_net_income(
     config: &Config,
     elapsed_years: i32,
-    income: i32,
-    capital_gains: i32,
-) -> i32 {
-    let provincial_taxes: i32 = config
+    income: f64,
+    capital_gains: f64,
+) -> f64 {
+    let provincial_taxes: f64 = config
         .provincial_tax_brackets
         .iter()
         .map(|b| b.adjust_for_inflation(elapsed_years, config.inflation))
-        .map(|b| b.compute_tax(income + capital_gains / 2))
+        .map(|b| b.compute_tax(income + capital_gains / 2.0))
         .sum();
 
-    let federal_taxes: i32 = config
+    let federal_taxes: f64 = config
         .federal_tax_brackets
         .iter()
         .map(|b| b.adjust_for_inflation(elapsed_years, config.inflation))
-        .map(|b| b.compute_tax(income + capital_gains / 2))
+        .map(|b| b.compute_tax(income + capital_gains / 2.0))
         .sum();
 
     income + capital_gains - provincial_taxes - federal_taxes
