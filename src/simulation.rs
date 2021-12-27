@@ -107,8 +107,13 @@ impl Simulation {
         step.unregistered_assets = config.unregistered_assets;
         step.tfsa_assets = config.tfsa_assets;
         step.rrsp_assets = config.rrsp_assets;
-        step.employer_rrsp_contribution = 2 * employer_rrsp_match(config.salary, config.rrsp_contribution_headroom, config.employer_rrsp_match);
-        step.personal_rrsp_contribution = config.rrsp_contribution_headroom - step.employer_rrsp_contribution;
+        step.employer_rrsp_contribution = 2 * employer_rrsp_match(
+            config.salary,
+            config.rrsp_contribution_headroom,
+            config.employer_rrsp_match,
+        );
+        step.personal_rrsp_contribution =
+            config.rrsp_contribution_headroom - step.employer_rrsp_contribution;
 
         step.tfsa_assets += step.tfsa_contribution();
         step.unregistered_assets += step.unregistered_contribution();
@@ -158,8 +163,13 @@ impl SimulationStep {
 
         let years_since_start = previous_year.years_since_start + 1;
 
-        let rrsp_contribution_headroom = rrsp_contribution_headroom(previous_year.income(), years_since_start, config.inflation);
-        let employer_rrsp_match = employer_rrsp_match(previous_year.salary(), rrsp_contribution_headroom, config.employer_rrsp_match);
+        let rrsp_contribution_headroom =
+            rrsp_contribution_headroom(previous_year.income(), years_since_start, config.inflation);
+        let employer_rrsp_match = employer_rrsp_match(
+            previous_year.salary(),
+            rrsp_contribution_headroom,
+            config.employer_rrsp_match,
+        );
 
         let personal_rrsp_contribution = rrsp_contribution_headroom - 2 * employer_rrsp_match;
         let employer_rrsp_contribution = employer_rrsp_match * 2;
@@ -351,4 +361,3 @@ pub fn compute_net_income(
 
     income + capital_gains - provincial_taxes - federal_taxes
 }
-
