@@ -30,7 +30,7 @@ fn main() -> Result<()> {
 
     let config = toml::from_str(&config_file_content).context("Invalid TOML in config file")?;
 
-    let simulation = Simulation::new(config);
+    let simulation = Simulation::new(&config);
     output::print(simulation, options.number_of_years, options.base_year);
 
     Ok(())

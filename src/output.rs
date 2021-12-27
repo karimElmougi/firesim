@@ -68,7 +68,7 @@ struct SimulationOutput {
     retirement_cost_of_living: i32,
 }
 
-impl From<SimulationStep> for SimulationOutput {
+impl From<SimulationStep<'_>> for SimulationOutput {
     fn from(step: SimulationStep) -> Self {
         Self {
             year: step.years_since_start + 1,

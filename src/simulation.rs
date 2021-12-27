@@ -1,5 +1,4 @@
 use std::cmp::{max, min};
-use std::rc::Rc;
 
 use serde::Deserialize;
 
@@ -12,16 +11,18 @@ const MAX_TFSA_CONTRIBUTION: i32 = 6000;
 struct TaxBracket {
     #[serde(default)]
     lower_bound: i32,
+
     #[serde(default)]
     upper_bound: i32,
-    #[serde(default)]
-    percentage: f64,
+
+    #[serde(default, alias = "percentage")]
+    rate: f64,
 }
 
 impl TaxBracket {
     pub fn compute_tax(&self, income: i32) -> i32 {
-        (max(0, min(income, self.upper_bound) - self.lower_bound) as f64 * self.percentage / 100.0)
-            as i32
+        let portion_of_income = max(0, min(income, self.upper_bound) - self.lower_bound);
+        (portion_of_income as f64 * self.rate / 100.0) as i32
     }
 
     pub fn adjust_for_inflation(&self, elapsed_years: i32, inflation_rate: f64) -> TaxBracket {
@@ -39,6 +40,9 @@ pub struct Config {
     inflation: f64,
     salary_growth: f64,
     return_on_investment: f64,
+    salary: i32,
+    cost_of_living: i32,
+    retirement_cost_of_living: i32,
 
     #[serde(default = "default_withdraw_rate")]
     withdraw_rate: f64,
@@ -48,10 +52,6 @@ pub struct Config {
 
     #[serde(default = "default_salary_cap")]
     salary_cap: i32,
-
-    salary: i32,
-    cost_of_living: i32,
-    retirement_cost_of_living: i32,
 
     #[serde(default)]
     rrsp_contribution_headroom: i32,
@@ -65,8 +65,7 @@ pub struct Config {
     #[serde(default)]
     unregistered_assets: i32,
 
-    #[serde(default)]
-    #[serde(alias = "state_tax_brackets")]
+    #[serde(default, alias = "state_tax_brackets")]
     provincial_tax_brackets: Vec<TaxBracket>,
 
     #[serde(default)]
@@ -95,14 +94,13 @@ fn default_withdraw_rate() -> f64 {
     0.04
 }
 
-pub struct Simulation {
-    step: SimulationStep,
+pub struct Simulation<'a> {
+    step: SimulationStep<'a>,
 }
 
-impl Simulation {
-    pub fn new(config: Config) -> Simulation {
-        let config = Rc::new(config);
-        let mut step = SimulationStep::new(config.clone());
+impl<'a> Simulation<'a> {
+    pub fn new(config: &'a Config) -> Self {
+        let mut step = SimulationStep::new(config);
 
         step.unregistered_assets = config.unregistered_assets;
         step.tfsa_assets = config.tfsa_assets;
@@ -123,8 +121,8 @@ impl Simulation {
     }
 }
 
-impl Iterator for Simulation {
-    type Item = SimulationStep;
+impl<'a> Iterator for Simulation<'a> {
+    type Item = SimulationStep<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let current = self.step.clone();
@@ -134,18 +132,18 @@ impl Iterator for Simulation {
 }
 
 #[derive(Debug, Clone)]
-pub struct SimulationStep {
+pub struct SimulationStep<'a> {
     pub years_since_start: i32,
     pub personal_rrsp_contribution: i32,
     pub employer_rrsp_contribution: i32,
     pub rrsp_assets: i32,
     pub tfsa_assets: i32,
     pub unregistered_assets: i32,
-    config: Rc<Config>,
+    config: &'a Config,
 }
 
-impl SimulationStep {
-    fn new(config: Rc<Config>) -> SimulationStep {
+impl<'a> SimulationStep<'a> {
+    fn new(config: &'a Config) -> SimulationStep {
         SimulationStep {
             years_since_start: 0,
             personal_rrsp_contribution: 0,
@@ -157,8 +155,8 @@ impl SimulationStep {
         }
     }
 
-    fn next(&self) -> SimulationStep {
-        let config = &self.config;
+    fn next(&self) -> Self {
+        let config = self.config;
         let previous_year = self;
 
         let years_since_start = previous_year.years_since_start + 1;
@@ -219,7 +217,7 @@ impl SimulationStep {
 
     pub fn net_income(&self) -> i32 {
         compute_net_income(
-            &self.config,
+            self.config,
             self.years_since_start,
             self.taxable_income(),
             0,
@@ -265,12 +263,12 @@ impl SimulationStep {
     }
 
     pub fn passive_income(&self) -> i32 {
-        withdraw_from(&self.config, self.tfsa_assets)
+        withdraw_from(self.config, self.tfsa_assets)
             + compute_net_income(
-                self.config.as_ref(),
+                self.config,
                 self.years_since_start,
-                withdraw_from(&self.config, self.rrsp_assets) + self.dividends_income(),
-                withdraw_from(&self.config, self.unregistered_assets),
+                withdraw_from(self.config, self.rrsp_assets) + self.dividends_income(),
+                withdraw_from(self.config, self.unregistered_assets),
             )
     }
 
