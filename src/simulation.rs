@@ -1,3 +1,5 @@
+use std::cmp::min;
+
 use crate::accounting::{self, FiscalYear};
 use crate::accounting::{Constants, TaxBracket};
 
@@ -101,21 +103,48 @@ impl<'a> SimulationStep<'a> {
 
         let constants = Constants::new(tax_brackets);
 
-        let fiscal_year = FiscalYear {
-            income: config.initial_values.salary as f64,
-            personal_rrsp_contribution: 0.0,
-            employer_rrsp_contribution: 0.0,
-            rrsp_assets: config.initial_values.rrsp_assets as f64,
-            tfsa_contribution: 0.0,
-            tfsa_assets: config.initial_values.tfsa_assets as f64,
-            unregistered_contribution: 0.0,
-            unregistered_assets: config.initial_values.unregistered_assets as f64,
+        let income = min(config.initial_values.salary, config.rates.salary_cap) as f64;
+
+        let (personal_rrsp_contribution, employer_rrsp_contribution) =
+            accounting::rrsp_contribution(
+                config.initial_values.rrsp_contribution_headroom as f64,
+                income,
+                config.rates.employer_rrsp_match,
+            );
+        let total_rrsp_contribution = personal_rrsp_contribution + employer_rrsp_contribution;
+
+        let rrsp_assets = config.initial_values.rrsp_assets as f64 + total_rrsp_contribution;
+
+        let taxable_income = income - personal_rrsp_contribution;
+        let net_income = accounting::net_income(&constants.tax_brackets, taxable_income, 0.0);
+        let cost_of_living = config.initial_values.cost_of_living as f64;
+
+        let tfsa_contribution =
+            accounting::tfsa_contribution(&constants, net_income, cost_of_living);
+
+        let tfsa_assets = config.initial_values.tfsa_assets as f64 + tfsa_contribution;
+
+        let unregistered_contribution =
+            accounting::unregistered_contribution(&constants, net_income, cost_of_living);
+
+        let unregistered_assets =
+            config.initial_values.unregistered_assets as f64 + unregistered_contribution;
+
+        let year_0 = FiscalYear {
+            income: income as f64,
+            personal_rrsp_contribution,
+            employer_rrsp_contribution,
+            rrsp_assets: rrsp_assets as f64,
+            tfsa_contribution,
+            tfsa_assets,
+            unregistered_contribution,
+            unregistered_assets,
             cost_of_living: config.initial_values.cost_of_living as f64,
             constants,
         };
 
         SimulationStep {
-            fiscal_year,
+            fiscal_year: year_0,
             retirement_cost_of_living: config.initial_values.retirement_cost_of_living as f64,
             rates: &config.rates,
         }
@@ -133,14 +162,13 @@ impl<'a> SimulationStep<'a> {
         let rrsp_contribution_headroom =
             accounting::rrsp_contribution_headroom(&previous.fiscal_year);
 
-        let employer_rrsp_match = accounting::rrsp_match(
-            income,
-            rrsp_contribution_headroom,
-            rates.employer_rrsp_match,
-        );
+        let (personal_rrsp_contribution, employer_rrsp_contribution) =
+            accounting::rrsp_contribution(
+                rrsp_contribution_headroom,
+                income,
+                rates.employer_rrsp_match,
+            );
 
-        let personal_rrsp_contribution = rrsp_contribution_headroom - 2.0 * employer_rrsp_match;
-        let employer_rrsp_contribution = employer_rrsp_match * 2.0;
         let total_rrsp_contribution = personal_rrsp_contribution + employer_rrsp_contribution;
 
         let rrsp_assets = previous.fiscal_year.rrsp_assets
@@ -157,14 +185,10 @@ impl<'a> SimulationStep<'a> {
 
         let taxable_income = income - personal_rrsp_contribution;
         let net_income = accounting::net_income(&constants.tax_brackets, taxable_income, 0.0);
-
         let cost_of_living = previous.fiscal_year.cost_of_living * rates.inflation;
-        let discretionary_income = net_income - cost_of_living;
 
-        let tfsa_contribution = f64::max(
-            0.0,
-            f64::min(constants.tfsa_contribution_limit, discretionary_income),
-        );
+        let tfsa_contribution =
+            accounting::tfsa_contribution(&constants, net_income, cost_of_living);
 
         let tfsa_assets = previous.fiscal_year.tfsa_assets
             + accounting::return_on_investment(
@@ -173,7 +197,8 @@ impl<'a> SimulationStep<'a> {
             )
             + tfsa_contribution;
 
-        let unregistered_contribution = f64::max(0.0, discretionary_income - tfsa_contribution);
+        let unregistered_contribution =
+            accounting::unregistered_contribution(&constants, net_income, cost_of_living);
 
         let unregistered_assets = previous.fiscal_year.unregistered_assets
             + accounting::return_on_investment(

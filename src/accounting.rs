@@ -130,6 +130,34 @@ pub fn rrsp_contribution_headroom(year: &FiscalYear) -> f64 {
     )
 }
 
+pub fn rrsp_contribution(headroom: f64, income: f64, match_percentage: f64) -> (f64, f64) {
+    let employer_match = rrsp_match(income, headroom, match_percentage);
+    let contribution_to_employer_rrsp = employer_match * 2.0;
+    let personal_contribution = headroom - contribution_to_employer_rrsp;
+
+    (personal_contribution, contribution_to_employer_rrsp)
+}
+
+pub fn tfsa_contribution(constants: &Constants, net_income: f64, cost_of_living: f64) -> f64 {
+    let discretionary_income = net_income - cost_of_living;
+
+    f64::max(
+        0.0,
+        f64::min(constants.tfsa_contribution_limit, discretionary_income),
+    )
+}
+
+pub fn unregistered_contribution(
+    constants: &Constants,
+    net_income: f64,
+    cost_of_living: f64,
+) -> f64 {
+    let discretionary_income = net_income - cost_of_living;
+    let tfsa_contribution = tfsa_contribution(constants, net_income, cost_of_living);
+
+    f64::max(0.0, discretionary_income - tfsa_contribution)
+}
+
 pub fn return_on_investment(asset: f64, rate_of_return: f64) -> f64 {
     asset * (rate_of_return - 1.0)
 }
