@@ -111,6 +111,7 @@ impl<'a> SimulationStep<'a> {
                 income,
                 config.rates.employer_rrsp_match,
             );
+
         let total_rrsp_contribution = personal_rrsp_contribution + employer_rrsp_contribution;
 
         let rrsp_assets = config.initial_values.rrsp_assets as f64 + total_rrsp_contribution;
@@ -171,13 +172,6 @@ impl<'a> SimulationStep<'a> {
 
         let total_rrsp_contribution = personal_rrsp_contribution + employer_rrsp_contribution;
 
-        let rrsp_assets = previous.fiscal_year.rrsp_assets
-            + accounting::return_on_investment(
-                previous.fiscal_year.rrsp_assets,
-                rates.return_on_investment,
-            )
-            + total_rrsp_contribution;
-
         let constants = previous
             .fiscal_year
             .constants
@@ -190,22 +184,34 @@ impl<'a> SimulationStep<'a> {
         let tfsa_contribution =
             accounting::tfsa_contribution(&constants, net_income, cost_of_living);
 
-        let tfsa_assets = previous.fiscal_year.tfsa_assets
-            + accounting::return_on_investment(
-                previous.fiscal_year.tfsa_assets,
-                rates.return_on_investment,
-            )
-            + tfsa_contribution;
-
         let unregistered_contribution =
             accounting::unregistered_contribution(&constants, net_income, cost_of_living);
 
-        let unregistered_assets = previous.fiscal_year.unregistered_assets
-            + accounting::return_on_investment(
-                previous.fiscal_year.unregistered_assets,
-                rates.return_on_investment,
-            )
-            + unregistered_contribution;
+        let mut tfsa_assets = previous.fiscal_year.tfsa_assets;
+        let mut rrsp_assets = previous.fiscal_year.rrsp_assets;
+        let mut unregistered_assets = previous.fiscal_year.unregistered_assets;
+
+        {
+            const NB_PAY_PERIOD: u8 = 24;
+
+            let period_tfsa_contribution = tfsa_contribution / NB_PAY_PERIOD as f64;
+            let period_rrsp_contribution = total_rrsp_contribution / NB_PAY_PERIOD as f64;
+            let period_unnegistered_contribution = unregistered_contribution / NB_PAY_PERIOD as f64;
+
+            let period_return = nth_root(NB_PAY_PERIOD, rates.return_on_investment);
+
+            for _ in 0..NB_PAY_PERIOD {
+                rrsp_assets += accounting::return_on_investment(rrsp_assets, period_return)
+                    + period_rrsp_contribution;
+
+                tfsa_assets += accounting::return_on_investment(tfsa_assets, period_return)
+                    + period_tfsa_contribution;
+
+                unregistered_assets +=
+                    accounting::return_on_investment(unregistered_assets, period_return)
+                        + period_unnegistered_contribution;
+            }
+        }
 
         let next_year = FiscalYear {
             income,
@@ -237,5 +243,21 @@ impl<'a> SimulationStep<'a> {
                 year.rrsp_assets * withdraw_rate,
                 year.unregistered_assets * withdraw_rate,
             )
+    }
+}
+
+// Shamelessly stolen from https://rosettacode.org/wiki/Nth_root
+fn nth_root(n: u8, num: f64) -> f64 {
+    let n = n as f64;
+
+    let p = 1e-9_f64;
+    let mut x0 = num / n;
+
+    loop {
+        let x1 = ((n - 1.0) * x0 + num / f64::powf(x0, n - 1.0)) / n;
+        if (x1 - x0).abs() < (x0 * p).abs() {
+            return x1;
+        };
+        x0 = x1
     }
 }
