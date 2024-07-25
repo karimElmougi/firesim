@@ -40,8 +40,8 @@ pub struct Constants {
 
 impl Constants {
     pub fn new(tax_brackets: Vec<TaxBracket>) -> Self {
-        const MAX_RRSP_CONTRIBUTION: i32 = 26500; // 2019 value
-        const MAX_TFSA_CONTRIBUTION: i32 = 6000; // 2021 value
+        const MAX_RRSP_CONTRIBUTION: i32 = 32000; // 2024 value
+        const MAX_TFSA_CONTRIBUTION: i32 = 7000; // 2024 value
 
         Self {
             tfsa_contribution_limit: MAX_TFSA_CONTRIBUTION as f64,
